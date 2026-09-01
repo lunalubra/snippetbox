@@ -18,7 +18,8 @@ import (
 
 type application struct {
 	logger         *slog.Logger
-	snippets       *models.SnippetModel
+	snippets       models.SnippetModelInterface
+	users          models.UserModelInterface
 	templateCache  map[string]*template.Template
 	formDecoder    *form.Decoder
 	sessionManager *scs.SessionManager
@@ -49,10 +50,12 @@ func main() {
 	sessionManager := scs.New()
 	sessionManager.Store = mysqlstore.New(db)
 	sessionManager.Lifetime = 12 * time.Hour
+	sessionManager.Cookie.Secure = true
 
 	application := application{
 		logger:         logger,
 		snippets:       &models.SnippetModel{DB: db},
+		users:          &models.UserModel{DB: db},
 		templateCache:  templateCache,
 		formDecoder:    formDecoder,
 		sessionManager: sessionManager,
@@ -63,12 +66,13 @@ func main() {
 	logger.Info("starting server", "addr", *addr)
 	s := http.Server{
 		Addr:         *addr,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 90 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 		Handler:      router,
+		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
 	}
-	err = s.ListenAndServe()
+	err = s.ListenAndServeTLS("./assets/tls/localhost.pem", "./assets/tls/localhost-key.pem")
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error(err.Error())
 		os.Exit(1)
