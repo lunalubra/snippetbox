@@ -26,8 +26,22 @@ type application struct {
 }
 
 func main() {
-	addr := flag.String("addr", ":4000", "HTTP network address")
-	dsn := flag.String("dsn", "web:acosta@/snippetbox?parseTime=true", "MySQL data source name")
+	defaultAddr := ":4000"
+	if port := os.Getenv("PORT"); port != "" {
+		defaultAddr = ":" + port
+	}
+
+	defaultDSN := "web:acosta@/snippetbox?parseTime=true"
+	if envDSN := os.Getenv("DSN"); envDSN != "" {
+		defaultDSN = envDSN
+	}
+
+	// Upsun's router terminates TLS, so the app must serve plain HTTP there.
+	defaultTLS := os.Getenv("PLATFORM_APPLICATION") == ""
+
+	addr := flag.String("addr", defaultAddr, "HTTP network address")
+	dsn := flag.String("dsn", defaultDSN, "MySQL data source name")
+	useTLS := flag.Bool("tls", defaultTLS, "Serve HTTPS with the local self-signed certificate")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
@@ -72,7 +86,11 @@ func main() {
 		Handler:      router,
 		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
 	}
-	err = s.ListenAndServeTLS("./assets/tls/localhost.pem", "./assets/tls/localhost-key.pem")
+	if *useTLS {
+		err = s.ListenAndServeTLS("./assets/tls/localhost.pem", "./assets/tls/localhost-key.pem")
+	} else {
+		err = s.ListenAndServe()
+	}
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error(err.Error())
 		os.Exit(1)

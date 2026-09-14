@@ -1,0 +1,40 @@
+applications:
+  snippetbox:
+    # Bump this to the newest Go image the Upsun catalogue offers. go.mod
+    # requires a newer toolchain than the image ships, so the build hook lets
+    # the Go toolchain fetch the version named in go.mod (GOTOOLCHAIN=auto).
+    type: "golang:1.25"
+    source:
+      root: "/"
+
+    relationships:
+      mysql: "mysql:mysql"
+
+    hooks:
+      build: |
+        set -e
+        export GOTOOLCHAIN=auto
+        go build -o bin/app ./cmd/web
+      deploy: |
+        set -e
+        mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USERNAME" --password="$MYSQL_PASSWORD" "$MYSQL_PATH" < db/schema.sql
+
+    web:
+      commands:
+        # Upsun's router terminates TLS, so the app serves plain HTTP here.
+        start: "./bin/app -addr=\":$PORT\""
+      locations:
+        "/":
+          passthru: true
+
+services:
+  mysql:
+    type: "mariadb:11.4"
+
+routes:
+  "https://{default}/":
+    type: upstream
+    upstream: "snippetbox:http"
+  "https://www.{default}/":
+    type: redirect
+    to: "https://{default}/"

@@ -1,0 +1,9 @@
+# Upsun sources this file into the environment of every build/deploy hook and
+# of the running application container.
+#
+# Upsun injects the MySQL credentials as MYSQL_* variables (the relationship is
+# named "mysql" in .upsun/config.yaml). Assemble them into the DSN format the
+# go-sql-driver/mysql driver expects. The guard keeps local shells untouched.
+if [ -n "$MYSQL_HOST" ]; then
+    export DSN="${MYSQL_USERNAME}:${MYSQL_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/${MYSQL_PATH}?parseTime=true"
+fi
