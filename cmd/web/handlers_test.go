@@ -76,6 +76,126 @@ func TestSnippetView(t *testing.T) {
 	}
 }
 
+func TestSnippetViewExtendForm(t *testing.T) {
+	app := newTestApplication(t)
+
+	ts := newTestServer(t, app.routes())
+	defer ts.Close()
+
+	tests := []struct {
+		name     string
+		urlPath  string
+		wantForm bool
+	}{
+		{
+			name:     "Snippet close to expiry",
+			urlPath:  "/snippet/view/1",
+			wantForm: true,
+		},
+		{
+			name:     "Long lived snippet",
+			urlPath:  "/snippet/view/3",
+			wantForm: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts.resetClientCookieJar(t)
+
+			res := ts.get(t, tt.urlPath)
+			assert.Equal(t, res.status, http.StatusOK)
+			assert.Equal(t, strings.Contains(res.body, "/snippet/extend/"), tt.wantForm)
+		})
+	}
+}
+
+func TestSnippetExtendPost(t *testing.T) {
+	app := newTestApplication(t)
+
+	ts := newTestServer(t, app.routes())
+	defer ts.Close()
+
+	tests := []struct {
+		name              string
+		urlPath           string
+		authenticate      bool
+		useValidCSRFToken bool
+		wantStatus        int
+		wantLocation      string
+	}{
+		{
+			name:              "Extendable snippet",
+			urlPath:           "/snippet/extend/1",
+			authenticate:      true,
+			useValidCSRFToken: true,
+			wantStatus:        http.StatusSeeOther,
+			wantLocation:      "/snippet/view/1",
+		},
+		{
+			name:              "Not extendable snippet",
+			urlPath:           "/snippet/extend/3",
+			authenticate:      true,
+			useValidCSRFToken: true,
+			wantStatus:        http.StatusSeeOther,
+			wantLocation:      "/snippet/view/3",
+		},
+		{
+			name:              "String ID",
+			urlPath:           "/snippet/extend/foo",
+			authenticate:      true,
+			useValidCSRFToken: true,
+			wantStatus:        http.StatusNotFound,
+		},
+		{
+			name:              "Negative ID",
+			urlPath:           "/snippet/extend/-1",
+			authenticate:      true,
+			useValidCSRFToken: true,
+			wantStatus:        http.StatusNotFound,
+		},
+		{
+			name:              "Invalid CSRF token",
+			urlPath:           "/snippet/extend/1",
+			authenticate:      true,
+			useValidCSRFToken: false,
+			wantStatus:        http.StatusBadRequest,
+		},
+		{
+			name:              "Unauthenticated",
+			urlPath:           "/snippet/extend/1",
+			authenticate:      false,
+			useValidCSRFToken: true,
+			wantStatus:        http.StatusSeeOther,
+			wantLocation:      "/user/login",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts.resetClientCookieJar(t)
+
+			if tt.authenticate {
+				ts.login(t)
+			}
+
+			res := ts.get(t, "/snippet/view/1")
+
+			form := url.Values{}
+			if tt.useValidCSRFToken {
+				form.Add("csrf_token", extractCSRFToken(t, res.body))
+			}
+
+			res = ts.postForm(t, tt.urlPath, form)
+
+			assert.Equal(t, res.status, tt.wantStatus)
+			if tt.wantLocation != "" {
+				assert.Equal(t, res.headers.Get("Location"), tt.wantLocation)
+			}
+		})
+	}
+}
+
 func TestUserSignup(t *testing.T) {
 	app := newTestApplication(t)
 	ts := newTestServer(t, app.routes())

@@ -12,6 +12,12 @@
             <time>Created: {{humanDate .Created}}</time>
             <time>Expires: {{.Expires}}</time>
         </div>
+        {{if canExtend .Expires}}
+        <form action='/snippet/extend/{{.ID}}' method='POST'>
+            <input type='hidden' name='csrf_token' value='{{$.CSRFToken}}'>
+            <input type='submit' value='Extend expiry by 7 days'>
+        </form>
+        {{end}}
     </div>
     {{end}}
 {{end}}
