@@ -76,6 +76,100 @@ func TestSnippetView(t *testing.T) {
 	}
 }
 
+func TestSnippetClonePost(t *testing.T) {
+	app := newTestApplication(t)
+
+	ts := newTestServer(t, app.routes())
+	defer ts.Close()
+
+	login := func(t *testing.T) {
+		res := ts.get(t, "/user/login")
+
+		form := url.Values{}
+		form.Add("email", "alice@example.com")
+		form.Add("password", "pa$$word")
+		form.Add("csrf_token", extractCSRFToken(t, res.body))
+
+		res = ts.postForm(t, "/user/login", form)
+		assert.Equal(t, res.status, http.StatusSeeOther)
+	}
+
+	t.Run("Valid ID", func(t *testing.T) {
+		ts.resetClientCookieJar(t)
+		login(t)
+
+		res := ts.get(t, "/snippet/view/1")
+
+		form := url.Values{}
+		form.Add("csrf_token", extractCSRFToken(t, res.body))
+
+		res = ts.postForm(t, "/snippet/clone/1", form)
+
+		assert.Equal(t, res.status, http.StatusSeeOther)
+		assert.Equal(t, res.headers.Get("Location"), "/snippet/view/2")
+	})
+
+	t.Run("Non-existent ID", func(t *testing.T) {
+		ts.resetClientCookieJar(t)
+		login(t)
+
+		res := ts.get(t, "/snippet/view/1")
+
+		form := url.Values{}
+		form.Add("csrf_token", extractCSRFToken(t, res.body))
+
+		res = ts.postForm(t, "/snippet/clone/2", form)
+
+		assert.Equal(t, res.status, http.StatusNotFound)
+	})
+
+	t.Run("String ID", func(t *testing.T) {
+		ts.resetClientCookieJar(t)
+		login(t)
+
+		res := ts.get(t, "/snippet/view/1")
+
+		form := url.Values{}
+		form.Add("csrf_token", extractCSRFToken(t, res.body))
+
+		res = ts.postForm(t, "/snippet/clone/foo", form)
+
+		assert.Equal(t, res.status, http.StatusNotFound)
+	})
+
+	t.Run("Invalid CSRF token", func(t *testing.T) {
+		ts.resetClientCookieJar(t)
+		login(t)
+
+		res := ts.postForm(t, "/snippet/clone/1", url.Values{})
+
+		assert.Equal(t, res.status, http.StatusBadRequest)
+	})
+
+	t.Run("Unauthenticated", func(t *testing.T) {
+		ts.resetClientCookieJar(t)
+
+		res := ts.get(t, "/user/login")
+
+		form := url.Values{}
+		form.Add("csrf_token", extractCSRFToken(t, res.body))
+
+		res = ts.postForm(t, "/snippet/clone/1", form)
+
+		assert.Equal(t, res.status, http.StatusSeeOther)
+		assert.Equal(t, res.headers.Get("Location"), "/user/login")
+	})
+
+	t.Run("Wrong method", func(t *testing.T) {
+		ts.resetClientCookieJar(t)
+		login(t)
+
+		res := ts.get(t, "/snippet/clone/1")
+
+		assert.Equal(t, res.status, http.StatusMethodNotAllowed)
+	})
+}
+
 func TestUserSignup(t *testing.T) {
 	app := newTestApplication(t)
 	ts := newTestServer(t, app.routes())
