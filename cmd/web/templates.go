@@ -18,8 +18,17 @@ func humanDate(t time.Time) string {
 	return t.UTC().Format("02 Jan 2006 at 15:04")
 }
 
+// canExtend reports whether a snippet with the given expiry time is close
+// enough to expiring for its expiry to be extended.
+func canExtend(expires time.Time) bool {
+	now := time.Now()
+
+	return expires.After(now) && expires.Sub(now) <= models.ExtensionWindow
+}
+
 var functions = template.FuncMap{
 	"humanDate": humanDate,
+	"canExtend": canExtend,
 }
 
 func newTemplateCache() (map[string]*template.Template, error) {

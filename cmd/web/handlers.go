@@ -52,6 +52,29 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (app *application) snippetExtendPost(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id < 1 {
+		http.NotFound(w, r)
+		return
+	}
+
+	expires, err := app.snippets.ExtendExpiry(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, models.ErrNotExtendable):
+			app.sessionManager.Put(r.Context(), "flash", "This snippet can't be extended yet.")
+		default:
+			app.serverError(w, r, err)
+			return
+		}
+	} else {
+		app.sessionManager.Put(r.Context(), "flash", fmt.Sprintf("Expiry extended to %s.", humanDate(expires)))
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%d", id), http.StatusSeeOther)
+}
+
 func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
 	data := app.newTemplateData(r)
 	data.Form = snippetCreateForm{

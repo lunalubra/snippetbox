@@ -8,4 +8,5 @@ var (
 	ErrNoRecord           = errors.New("models: no matching record found")
 	ErrInvalidCredentials = errors.New("models: invalid credential")
 	ErrDuplicateEmail     = errors.New("models: duplicate email")
+	ErrNotExtendable      = errors.New("models: snippet is not extendable")
 )

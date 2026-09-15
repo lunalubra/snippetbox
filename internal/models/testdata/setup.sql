@@ -8,6 +8,30 @@ CREATE TABLE snippets (
 
 CREATE INDEX idx_snippets_created ON snippets(created);
 
+INSERT INTO snippets (id, title, content, created, expires) VALUES (
+	1,
+	'Expiring soon',
+	'An old silent pond...',
+	UTC_TIMESTAMP(),
+	DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 DAY)
+);
+
+INSERT INTO snippets (id, title, content, created, expires) VALUES (
+	2,
+	'Long lived',
+	'Over the wintry forest...',
+	UTC_TIMESTAMP(),
+	DATE_ADD(UTC_TIMESTAMP(), INTERVAL 10 DAY)
+);
+
+INSERT INTO snippets (id, title, content, created, expires) VALUES (
+	3,
+	'Already expired',
+	'First autumn morning...',
+	DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY),
+	DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)
+);
+
 CREATE TABLE users (
 	id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
 	name VARCHAR(255) NOT NULL,

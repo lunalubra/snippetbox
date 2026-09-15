@@ -133,6 +133,20 @@ func (ts *testServer) postForm(t *testing.T, urlPath string, form url.Values) te
 	}
 }
 
+func (ts *testServer) login(t *testing.T) {
+	res := ts.get(t, "/user/login")
+
+	form := url.Values{}
+	form.Add("email", "alice@example.com")
+	form.Add("password", "pa$$word")
+	form.Add("csrf_token", extractCSRFToken(t, res.body))
+
+	res = ts.postForm(t, "/user/login", form)
+	if res.status != http.StatusSeeOther {
+		t.Fatalf("failed to log in: got status %d", res.status)
+	}
+}
+
 func extractCSRFToken(t *testing.T, body string) string {
 	csrfTokenRX := regexp.MustCompile(`<input type='hidden' name='csrf_token' value='(.+)'`)
 
