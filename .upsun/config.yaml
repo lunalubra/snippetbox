@@ -1,0 +1,62 @@
+applications:
+  snippetbox:
+    # go.mod asks for a newer toolchain than the runtime image ships, so the
+    # build hook lets the Go toolchain fetch the version named there
+    # (GOTOOLCHAIN=auto). Bump this to the newest Go image Upsun offers.
+    type: "golang:1.25"
+    source:
+      root: "/"
+
+    variables:
+      env:
+        GOTOOLCHAIN: auto
+
+    relationships:
+      mysql: "mysql:mysql"
+
+    hooks:
+      build: |
+        set -e
+        go build -o bin/app ./cmd/web
+      deploy: |
+        set -e
+        # Apply the schema on every deploy; every statement is idempotent.
+        # The password goes through MYSQL_PWD rather than the command line so
+        # it is not visible in the process list.
+        if command -v mariadb >/dev/null 2>&1; then
+          client=mariadb
+        elif command -v mysql >/dev/null 2>&1; then
+          client=mysql
+        else
+          echo "No MySQL/MariaDB client in the container: cannot apply db/schema.sql" >&2
+          exit 1
+        fi
+        MYSQL_PWD="$MYSQL_PASSWORD" "$client" \
+          --host="$MYSQL_HOST" \
+          --port="$MYSQL_PORT" \
+          --user="$MYSQL_USERNAME" \
+          --database="$MYSQL_PATH" < db/schema.sql
+
+    web:
+      commands:
+        # Upsun's router terminates TLS, so the app serves plain HTTP here.
+        start: "./bin/app -addr=\":$PORT\""
+      locations:
+        "/":
+          # Static assets are embedded in the binary (assets/efs.go) and served
+          # by the app itself, so every request is proxied upstream.
+          passthru: true
+          allow: false
+
+services:
+  mysql:
+    type: "mariadb:11.4"
+    disk: 1024
+
+routes:
+  "https://{default}/":
+    type: upstream
+    upstream: "snippetbox:http"
+  "https://www.{default}/":
+    type: redirect
+    to: "https://{default}/"
