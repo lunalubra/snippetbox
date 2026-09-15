@@ -20,6 +20,15 @@ func (m *SnippetModel) Insert(title string, content string, expires int) (int, e
 	return 2, nil
 }
 
+func (m *SnippetModel) Clone(id int) (int, error) {
+	switch id {
+	case 1:
+		return 2, nil
+	default:
+		return 0, models.ErrNoRecord
+	}
+}
+
 func (m *SnippetModel) Get(id int) (models.Snippet, error) {
 	switch id {
 	case 1:

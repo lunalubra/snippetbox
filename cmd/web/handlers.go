@@ -108,6 +108,29 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%d", id), http.StatusSeeOther)
 }
 
+func (app *application) snippetClonePost(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id < 1 {
+		http.NotFound(w, r)
+		return
+	}
+
+	newID, err := app.snippets.Clone(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, models.ErrNoRecord):
+			http.NotFound(w, r)
+		default:
+			app.serverError(w, r, err)
+		}
+		return
+	}
+
+	app.sessionManager.Put(r.Context(), "flash", "Snippet successfully cloned!")
+
+	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%d", newID), http.StatusSeeOther)
+}
+
 type userSignupForm struct {
 	Name                string `form:"name"`
 	Email               string `form:"email"`
