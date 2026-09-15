@@ -1,0 +1,27 @@
+# Upsun sources this file into the environment of every build/deploy hook and
+# of the running application container.
+#
+# The app expects a go-sql-driver/mysql DSN in $DSN. Assemble it from the
+# credentials Upsun injects for the "mysql" relationship declared in
+# .upsun/config.yaml. Every branch is guarded so local shells stay untouched.
+
+if [ -z "$DSN" ] && [ -n "$MYSQL_HOST" ]; then
+    export DSN="${MYSQL_USERNAME}:${MYSQL_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/${MYSQL_PATH}?parseTime=true"
+fi
+
+# Fallback for runtimes that do not expose per-service MYSQL_* variables:
+# decode the credentials out of $PLATFORM_RELATIONSHIPS instead.
+if [ -z "$DSN" ] && [ -n "$PLATFORM_RELATIONSHIPS" ] && command -v jq >/dev/null 2>&1; then
+    DSN="$(printf '%s' "$PLATFORM_RELATIONSHIPS" | base64 -d | jq -r \
+        '.mysql[0] | "\(.username):\(.password)@tcp(\(.host):\(.port))/\(.path)?parseTime=true"')"
+    if [ -n "$DSN" ] && [ "$DSN" != "null" ]; then
+        export DSN
+    else
+        unset DSN
+    fi
+fi
+
+# Fail loudly rather than silently falling back to the local development DSN.
+if [ -n "$PLATFORM_APPLICATION" ] && [ -z "$DSN" ]; then
+    echo "WARNING: no MySQL credentials found; \$DSN is unset and the app will not start" >&2
+fi
